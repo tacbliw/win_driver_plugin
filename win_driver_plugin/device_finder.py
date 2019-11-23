@@ -5,6 +5,7 @@ import re
 import collections
 import idc
 import logging
+import ida_nalt
 
 ASCII_BYTE = " !\"#\$%&\'\(\)\*\+,-\./0123456789:;<=>\?@ABCDEFGHIJKLMNOPQRSTUVWXYZ\[\]\^_`abcdefghijklmnopqrstuvwxyz\{\|\}\\\~\t"
 UNICODE_RE_4 = re.compile(b"((?:[%s]\x00){%d,})" % (ASCII_BYTE, 4))
@@ -49,7 +50,7 @@ def extract_unicode_strings(buf, n=4):
 def get_unicode_device_names():
     """Returns all Unicode strings within the binary currently being analysed in IDA which might be device names"""
 
-    path = idc.GetInputFile()
+    path = ida_nalt.get_root_filename()
     min_length = 4
     possible_names = set()
     with open(path, "rb") as f:
@@ -114,7 +115,7 @@ def search():
             return
         logging.basicConfig() #To avoid logger handler not found errors, from https://github.com/fireeye/flare-floss/blob/66f67a49a38ae028a5e86f1de743c384d5271901/scripts/idaplugin.py#L154
         logging.getLogger('vtrace.platforms.win32').setLevel(logging.ERROR)
-        sample_file_path = idc.GetInputFile()
+        sample_file_path = ida_nalt.get_root_filename()
 
         try:
             vw = viv_utils.getWorkspace(sample_file_path, should_save=False)

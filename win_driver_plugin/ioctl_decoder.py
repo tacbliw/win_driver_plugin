@@ -137,5 +137,5 @@ def get_define(ioctl_code):
     method_name, method_code = get_method(ioctl_code)
     access_name, access_code = get_access(ioctl_code)
 
-    name = "%s_0x%08X" % (idc.GetInputFile().split('.')[0], ioctl_code)
+    name = "%s_0x%08X" % (idc.ida_nalt.get_root_filename().split('.')[0], ioctl_code)
     return "#define %s CTL_CODE(0x%X, 0x%X, %s, %s)" % (name, device_code, function, method_name, access_name)

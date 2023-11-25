@@ -1,10 +1,11 @@
 import idc
 import idaapi
 from idaapi import Choose
-import driverlib
+from . import driverlib
 import ctypes
-import ioctl_decoder as ioctl_decoder
+from . import ioctl_decoder as ioctl_decoder
 import ida_nalt
+import ida_kernwin
 
 # yoinked from https://stackoverflow.com/a/25678113
 OpenClipboard = ctypes.windll.user32.OpenClipboard
@@ -29,15 +30,15 @@ class stop_unload_handler_t(idaapi.action_handler_t):
 
     def activate(self, ctx):
         if ctypes.windll.shell32.IsUserAnAdmin() == 0:
-            print "Admin privileges required"
+            print ("Admin privileges required")
             return
         name = idc.ida_nalt.get_root_filename().split('.')[0]
-        driver = driverlib.Driver(idc.ida_nalt.get_root_filenamePath(),name)
+        driver = driverlib.Driver(idc.get_input_file_path(),name)
         driver.stop()
         driver.unload()
 
     def update(self, ctx):
-        return idaapi.AST_ENABLE_FOR_FORM if idaapi.is_chooser_tform(ctx.form_type) else idaapi.AST_DISABLE_FOR_FORM
+        return idaapi.AST_ENABLE_FOR_WIDGET if idaapi.is_chooser_widget(ctx.form_type) else idaapi.AST_DISABLE_FOR_WIDGET
 
 class start_load_handler_t(idaapi.action_handler_t):
     def __init__(self):
@@ -45,15 +46,15 @@ class start_load_handler_t(idaapi.action_handler_t):
 
     def activate(self, ctx):
         if ctypes.windll.shell32.IsUserAnAdmin() == 0:
-            print "Admin privileges required"
+            print( "Admin privileges required")
             return
         name = idc.ida_nalt.get_root_filename().split('.')[0]
-        driver = driverlib.Driver(idc.ida_nalt.get_root_filenamePath(),name)
+        driver = driverlib.Driver(idc.get_input_file_path(),name)
         driver.load()
         driver.start()
         
     def update(self, ctx):
-        return idaapi.AST_ENABLE_FOR_FORM if idaapi.is_chooser_tform(ctx.form_type) else idaapi.AST_DISABLE_FOR_FORM        
+        return idaapi.AST_ENABLE_FOR_WIDGET if idaapi.is_chooser_widget(ctx.form_type) else idaapi.AST_DISABLE_FOR_WIDGET        
         
 class send_ioctl_handler_t(idaapi.action_handler_t):
     def __init__(self, items):
@@ -64,11 +65,11 @@ class send_ioctl_handler_t(idaapi.action_handler_t):
         ind = ctx.chooser_selection.at(0)
         ioctl = self.items[ind - 1]
         name = idc.ida_nalt.get_root_filename().split('.')[0]
-        driver = driverlib.Driver(idc.ida_nalt.get_root_filenamePath(),name)
+        driver = driverlib.Driver(idc.get_input_file_path(),name)
         DisplayIOCTLSForm(ioctl, driver)
 
     def update(self, ctx):
-        return idaapi.AST_ENABLE_FOR_FORM if idaapi.is_chooser_tform(ctx.form_type) else idaapi.AST_DISABLE_FOR_FORM
+        return idaapi.AST_ENABLE_FOR_WIDGET if idaapi.is_chooser_widget(ctx.form_type) else idaapi.AST_DISABLE_FOR_WIDGET
 
 class copy_defines_handler_t(idaapi.action_handler_t):
     def __init__(self, items):
@@ -79,39 +80,39 @@ class copy_defines_handler_t(idaapi.action_handler_t):
         defines = []
         for item in self.items:
             defines.append(item[5])
-        print(defines)
+        # print(defines)
         paste('\n'.join(defines))
 
     def update(self, ctx):
-        return idaapi.AST_ENABLE_FOR_FORM if idaapi.is_chooser_tform(ctx.form_type) else idaapi.AST_DISABLE_FOR_FORM
+        return idaapi.AST_ENABLE_FOR_WIDGET if idaapi.is_chooser_widget(ctx.form_type) else idaapi.AST_DISABLE_FOR_WIDGET
 
 class remove_ioctl(idaapi.action_handler_t):
-	
-	def __init__(self, items):
-		idaapi.action_handler_t.__init__(self)
-		self.items = items 
-		
-	def activate(self, ctx):
-		# get item and remove 
-		ind = ctx.chooser_selection.at(0)
-		ioctl = self.items[ind - 1]
-		pos = int(ioctl[0], 16)
-		define = ioctl[5]
-		global ioctl_tracker
-		code = None
-		for (addr, val) in ioctl_tracker.ioctls:
-			if addr == pos:
-				code = val
-				break
-		# Get current comment for this instruction and remove the C define from it, if present
-		comment = idc.Comment(pos)
-		comment = comment.replace(define, "")
-		idc.MakeComm(pos, comment)
-		# Remove the ioctl from the valid list and add it to the invalid list to avoid 'find_all_ioctls' accidentally re-indexing it.
-		ioctl_tracker.remove_ioctl(pos, code)
-		
-	def update(self, ctx):
-		return idaapi.AST_ENABLE_FOR_FORM if idaapi.is_chooser_tform(ctx.form_type) else idaapi.AST_DISABLE_FOR_FORM
+    
+    def __init__(self, items):
+        idaapi.action_handler_t.__init__(self)
+        self.items = items 
+        
+    def activate(self, ctx):
+        # get item and remove 
+        ind = ctx.chooser_selection.at(0)
+        ioctl = self.items[ind - 1]
+        pos = int(ioctl[0], 16)
+        define = ioctl[5]
+        global ioctl_tracker
+        code = None
+        for (addr, val) in ioctl_tracker.ioctls:
+            if addr == pos:
+                code = val
+                break
+        # Get current comment for this instruction and remove the C define from it, if present
+        comment = idc.Comment(pos)
+        comment = comment.replace(define, "")
+        idc.MakeComm(pos, comment)
+        # Remove the ioctl from the valid list and add it to the invalid list to avoid 'find_all_ioctls' accidentally re-indexing it.
+        ioctl_tracker.remove_ioctl(pos, code)
+        
+    def update(self, ctx):
+        return idaapi.AST_ENABLE_FOR_WIDGET if idaapi.is_chooser_widget(ctx.form_type) else idaapi.AST_DISABLE_FOR_WIDGET
 
 class MyChoose2(Choose):
 
@@ -136,16 +137,16 @@ class MyChoose2(Choose):
 
     def OnSelectLine(self, n):
 
-		item = self.items[n]
+        item = self.items[n]
 
-		jump_ea = int(item[0], 16)
-		# Only jump for valid addresses
-		if idaapi.IDA_SDK_VERSION < 700:
-			valid_addr = idc.isEnabled(jump_ea)
-		else:
-			valid_addr = idc.is_mapped(jump_ea)
-		if valid_addr:
-			idc.Jump(jump_ea)
+        jump_ea = int(item[0], 16)
+        # Only jump for valid addresses
+        if idaapi.IDA_SDK_VERSION < 700:
+            valid_addr = idc.isEnabled(jump_ea)
+        else:
+            valid_addr = idc.is_mapped(jump_ea)
+        if valid_addr:
+            ida_kernwin.jumpto(jump_ea)
 
     def OnGetLine(self, n):
         return self.items[n]
@@ -230,7 +231,7 @@ def create_ioctl_tab(tracker, modal=False):
     global c
     c = MyChoose2("IOCTL Code Viewer", items, modal=modal)
     c.show()
-    form = idaapi.get_current_tform()
+    form = idaapi.get_current_widget()
     idaapi.attach_action_to_popup(form, None, "choose2:act%s" % action)
     idaapi.attach_action_to_popup(form, None, "choose2:actcopy_defines")
     idaapi.attach_action_to_popup(form, None, "choose2:actstop_unload")
@@ -238,6 +239,9 @@ def create_ioctl_tab(tracker, modal=False):
     idaapi.attach_action_to_popup(form, None, "choose2:remove_ioctl")
 
 def paste(s):
+    import pyperclip
+    pyperclip.copy(s)
+    return
     if not isinstance(s, unicode_type):
         s = s.decode('mbcs')
     data = s.encode('utf-16le')
@@ -305,7 +309,7 @@ class DisplayIOCTLSForm(idaapi.Form):
         elif fid == self.sendIOCTL.id:
             pass
         else:
-            print fid
+            print (fid)
             
     def send_ioctl(self,fid):
         if not self.driver.handle:

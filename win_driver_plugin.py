@@ -96,19 +96,26 @@ class IOCTLTracker:
         self.ioctl_locs.add(addr)
         self.ioctls.append((addr, value))
 
-    def remove_ioctl(self, addr, value):
+    def remove_ioctl(self, addr, value=0):
         self.ioctl_locs.remove(addr)
-        self.ioctls.remove((addr, value))
+        if value:
+            self.ioctls.remove((addr, value))
+            return
+        else:
+            for ea, val in self.ioctls:
+                if ea == addr:
+                    self.ioctls.remove((ea, val))
+                    return
 		
     def print_table(self, ioctls):
-        print "%-10s | %-10s | %-42s | %-10s | %-22s | %s" % ("Address", "IOCTL Code", "Device", "Function", "Method", "Access")
+        print ("%-10s | %-10s | %-42s | %-10s | %-22s | %s" % ("Address", "IOCTL Code", "Device", "Function", "Method", "Access"))
         for (addr, ioctl_code) in ioctls:
             function = ioctl_decoder.get_function(ioctl_code)
             device_name, device_code = ioctl_decoder.get_device(ioctl_code)
             method_name, method_code = ioctl_decoder.get_method(ioctl_code)
             access_name, access_code = ioctl_decoder.get_access(ioctl_code)
             all_vars = (addr, ioctl_code, device_name, device_code, function, method_name, method_code, access_name, access_code)
-            print "0x%-8X | 0x%-8X | %-31s 0x%-8X | 0x%-8X | %-17s %-4d | %s (%d)" % all_vars
+            print ("0x%-8X | 0x%-8X | %-31s 0x%-8X | 0x%-8X | %-17s %-4d | %s (%d)" % all_vars)
 
 
 def find_all_ioctls():
@@ -124,8 +131,8 @@ def find_all_ioctls():
     fc = idaapi.FlowChart(f, flags=idaapi.FC_PREDS)
     for block in fc:
         # grab the last two instructions in the block 
-        last_inst = idc.PrevHead(block.end_ea)
-        penultimate_inst = idc.PrevHead(last_inst)
+        last_inst = idc.prev_head(block.end_ea)
+        penultimate_inst = idc.prev_head(last_inst)
         # If the penultimate instruction is cmp or sub against an immediate value immediately preceding a 'jz' 
         # then it's a decent guess that it's an IOCTL code (if this is a dispatch function)
         if idc.print_insn_mnem(penultimate_inst) in ['cmp', 'sub'] and idc.get_operand_type(penultimate_inst, 1) == 5:
@@ -165,8 +172,10 @@ def get_position_and_translate():
     """
 
     pos = idc.get_screen_ea()
-    if idc.get_operand_type(pos, 1) != 5:   # Check the second operand to the instruction is an immediate
-        return
+    # if idc.get_operand_type(pos, 1) != 5:   # Check the second operand to the instruction is an immediate
+    #     return
+
+
     
     value = get_operand_value(pos)
     ioctl_tracker.add_ioctl(pos, value)
@@ -247,19 +256,19 @@ def find_dispatch_function():
     if len(index_funcs) == 0:
         cfg_finds_to_print = min(len(cfg_funcs),3)
         for i in range(cfg_finds_to_print):
-            print "Based off of basic CFG analysis the potential dispatch functions are: " + cfg_funcs[i]
+            print ("Based off of basic CFG analysis the potential dispatch functions are: " + cfg_funcs[i])
     elif len(index_funcs) == 1:
         func = index_funcs.pop()
         if func in cfg_funcs:
-            print "The likely dispatch function is: " + func
+            print ("The likely dispatch function is: " + func)
         else:
-            print "Based off of the offset it is loaded at a potential dispatch function is: " + func
-            print "Based off of basic CFG analysis the likely dispatch function is: " + cfg_funcs[0]
+            print ("Based off of the offset it is loaded at a potential dispatch function is: " + func)
+            print ("Based off of basic CFG analysis the likely dispatch function is: " + cfg_funcs[0])
     else:
-        print "Potential dispatch functions: "
+        print ("Potential dispatch functions: ")
         for i in index_funcs:
             if i in cfg_funcs:
-                print i
+                print (i)
 
 def get_pool_tags():
 	""" Display a list of the pool tags in use by the current driver.
@@ -335,8 +344,8 @@ def register_dynamic_action(form, popup, description, handler):
 class WinDriverHooks(idaapi.UI_Hooks):
     """Installs hook function which is triggered when popup forms are created and adds extra menu options if it is the right-click disasm view menu"""
 
-    def finish_populating_tform_popup(self, form, popup):
-        tft = idaapi.get_tform_type(form)
+    def finish_populating_widget_popup(self, form, popup):
+        tft = idaapi.get_widget_type(form)
         if tft != idaapi.BWN_DISASM:
             return
 

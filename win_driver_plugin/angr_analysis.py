@@ -1,13 +1,15 @@
 import idaapi
+import sys
+import ida_bytes
 
 def angr_find_ioctls(bin, dispatch_addr):
 	""" Takes a path to a binary and the identified dispatch functions address, attempts to find all valid IOCTL codes
 	"""
-	
+	sys.stdout.encoding = 'utf-8'
 	try:
 		import angr
 	except ImportError:
-		print "Please install angr to continue, see: https://github.com/andreafioraldi/angr-win64-wheels"
+		print ("Please install angr to continue, see: https://github.com/andreafioraldi/angr-win64-wheels")
 		return
 	
 	p = angr.Project(bin, auto_load_libs=False)
@@ -39,38 +41,37 @@ def find_dispatch(p):
 					dispatch_addr = store_consts[0].value
 					break
 	if not dispatch_addr:
-		print "Could not find IOCTL dispatch function :("    
+		print( "Could not find IOCTL dispatch function :(")
 	else:
-		print "Dispatch function found: " + hex(dispatch_addr)
+		print( "Dispatch function found: " + hex(dispatch_addr))
 	return dispatch_addr
 	
 def find_ioctls(p, dispatch_addr):
 	""" Returns a list of potential IOCTL codes by symbolically executing starting at the provided function address
 	"""
 	
-	import pyvex
-	import simuvex
+	import angr
 	import claripy
 	s = p.factory.blank_state(addr=dispatch_addr)
-	pg = p.factory.path_group(s)
+	pg = p.factory.simgr(s)
 
 	generic_reg_vals = set()
 	val_addr = {}
 	steps = 0
 	while len(pg.active) > 0 and steps < 25:
 		for i in pg.active:
-				if not idaapi.isLoaded(i.addr):
+				if not ida_bytes.is_loaded(i.addr):
 					print('Non mapped value for addr: {}'.format(hex(i.addr)))
 					continue
 				print('step: {}, addr: {}'.format(steps, hex(i.addr)))
-				for reg in i.state.arch.default_symbolic_registers:
+				for reg in i.arch.default_symbolic_registers:
 					try:
-						val = i.state.se.eval(getattr(i.state.regs, reg))
+						val = i.se.eval(getattr(i.regs, reg))
 						#Always use first occurrence
 						generic_reg_vals.add(val)
 						if val not in val_addr:
 							val_addr[val] = i.addr
-					except simuvex.SimUnsatError:
+					except angr.SimUnsatError:
 						print("failed to get {}".format(reg))
 					except claripy.errors.ClaripyZeroDivisionError:
 						print("failed to get {}".format(reg))
@@ -89,7 +90,7 @@ def find_ioctls(p, dispatch_addr):
 		return []
 	print('potential device codes: {}'.format(device_codes))
 	likely_device_code = max(device_codes, key=device_codes.get)
-	print "Likely device code: 0x%X" % (likely_device_code,)
+	print ("Likely device code: 0x%X" % (likely_device_code,))
 	
 	out = []
 	for i in generic_reg_vals:
